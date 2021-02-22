@@ -10,7 +10,7 @@ use sp_std::prelude::*;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
 	ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys, MultiSignature,
-	transaction_validity::{TransactionValidity, TransactionSource},
+	transaction_validity::{TransactionValidity, TransactionSource}, ModuleId,
 };
 use sp_runtime::traits::{
 	BlakeTwo256, Block as BlockT, Verify, IdentifyAccount, NumberFor, Saturating,
@@ -261,9 +261,40 @@ impl pallet_sudo::Trait for Runtime {
 	type Call = Call;
 }
 
+parameter_types! {
+	// Choose a fee that incentivizes desireable behavior.
+    pub const VoteReservationFee: u128 = 100;
+    pub const MinNickLength: usize = 8;
+    // Maximum bounds on storage are important to secure your chain.
+    pub const MaxNickLength: usize = 32;
+	pub const QuadraticFundingModuleId: ModuleId = ModuleId(*b"py/quafd");
+}
+
 /// Configure the template pallet in pallets/template.
 impl pallet_quadratic_funding::Trait for Runtime {
-	type Event = Event;
+	type ModuleId = QuadraticFundingModuleId;
+    // The Balances pallet implements the ReservableCurrency trait.
+    // https://substrate.dev/rustdocs/v2.0.0/pallet_balances/index.html#implementations-2
+    type Currency = pallet_balances::Module<Runtime>;
+
+    // Use the VoteReservationFee from the parameter_types block.
+    type ReservationFee = VoteReservationFee;
+
+    // No action is taken when deposits are forfeited.
+    type Slashed = ();
+
+    // Configure the FRAME System Root origin as the Nick pallet admin.
+    // https://substrate.dev/rustdocs/v2.0.0/frame_system/enum.RawOrigin.html#variant.Root
+    type ForceOrigin = frame_system::EnsureRoot<AccountId>;
+
+    // Use the MinNickLength from the parameter_types block.
+    type MinLength = MinNickLength;
+
+    // Use the MaxNickLength from the parameter_types block.
+    type MaxLength = MaxNickLength;
+
+    // The ubiquitous event type.
+    type Event = Event;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
