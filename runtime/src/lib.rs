@@ -262,11 +262,12 @@ impl pallet_sudo::Trait for Runtime {
 }
 
 parameter_types! {
-	// Choose a fee that incentivizes desireable behavior.
-    pub const VoteReservationFee: u128 = 100;
-    pub const MinNickLength: usize = 8;
-    // Maximum bounds on storage are important to secure your chain.
-    pub const MaxNickLength: usize = 32;
+	// pow(10,12) => Unit, for easy fee control, we use pow(10,9)
+    pub const VoteUnit: u128 = 1000000000;
+	// The base of unit per vote, should be 1 Unit of token for each vote
+    pub const NumberOfUnit: u128 = 1000;
+    // The ratio of fee for each trans, final value should be FeeRatio/NumberOfUnit
+    pub const FeeRatio: u128 = 60;
 	pub const QuadraticFundingModuleId: ModuleId = ModuleId(*b"py/quafd");
 }
 
@@ -277,8 +278,8 @@ impl pallet_quadratic_funding::Trait for Runtime {
     // https://substrate.dev/rustdocs/v2.0.0/pallet_balances/index.html#implementations-2
     type Currency = pallet_balances::Module<Runtime>;
 
-    // Use the VoteReservationFee from the parameter_types block.
-    type ReservationFee = VoteReservationFee;
+    // Use the UnitOfVote from the parameter_types block.
+    type UnitOfVote = VoteUnit;
 
     // No action is taken when deposits are forfeited.
     type Slashed = ();
@@ -288,10 +289,10 @@ impl pallet_quadratic_funding::Trait for Runtime {
     type ForceOrigin = frame_system::EnsureRoot<AccountId>;
 
     // Use the MinNickLength from the parameter_types block.
-    type MinLength = MinNickLength;
+    type NumberOfUnitPerVote = NumberOfUnit;
 
-    // Use the MaxNickLength from the parameter_types block.
-    type MaxLength = MaxNickLength;
+    // Use the FeeRatio from the parameter_types block.
+    type FeeRatioPerVote = FeeRatio;
 
     // The ubiquitous event type.
     type Event = Event;

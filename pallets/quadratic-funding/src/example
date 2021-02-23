@@ -1,10 +1,10 @@
 [
   {
     "Project": {
-      "total_votes":"u32",
-      "grants": "u32",
-      "support_area": "u32",
-      "withdrew": "u32",
+      "total_votes":"u128",
+      "grants": "u128",
+      "support_area": "u128",
+      "withdrew": "u128",
       "name": "Vec<u8>",
       "round": "u32",
       "owner": "AccountId"

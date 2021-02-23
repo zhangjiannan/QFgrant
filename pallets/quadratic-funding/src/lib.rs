@@ -7,14 +7,13 @@
 
 use frame_support::{
 	decl_module, decl_storage, decl_event, decl_error, dispatch, debug, ensure,
-	traits::{Currency, EnsureOrigin, ReservableCurrency, OnUnbalanced, Get, ExistenceRequirement::{KeepAlive, AllowDeath}},
+	traits::{Currency, EnsureOrigin, ReservableCurrency, OnUnbalanced, Get, ExistenceRequirement::{KeepAlive}},
 };
-use sp_runtime::{Permill, ModuleId, Percent, RuntimeDebug, DispatchResult, traits::{
-	Zero, StaticLookup, AccountIdConversion, Saturating, Hash, BadOrigin
-}};
+use sp_runtime::{ModuleId, traits::{StaticLookup, AccountIdConversion}};
 use frame_support::codec::{Encode, Decode};
-use frame_system::ensure_signed;
-use sp_std::vec::Vec;
+use frame_system::{ensure_signed, ensure_root};
+use sp_std::{vec::Vec, convert::{TryInto}};
+// use sp_runtime::traits::CheckedMul;
 
 #[cfg(test)]
 mod mock;
@@ -24,10 +23,10 @@ mod tests;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
 pub struct Project<AccountId> {
-	pub total_votes: u32,
-	pub grants: u32,
-	pub support_area: u32,
-	pub withdrew: u32,
+	pub total_votes: u128,
+	pub grants: u128,
+	pub support_area: u128,
+	pub withdrew: u128,
 	pub name: Vec<u8>,
 	pub round: u32,
 	pub owner: AccountId,
@@ -49,8 +48,8 @@ pub trait Trait: frame_system::Trait {
 	/// The currency trait.
 	type Currency: ReservableCurrency<Self::AccountId>;
 
-	/// Reservation fee.
-	type ReservationFee: Get<BalanceOf<Self>>;
+	/// UnitOfVote, 0.001 Unit token
+	type UnitOfVote: Get<u128>;
 
 	/// What to do with slashed funds.
 	type Slashed: OnUnbalanced<NegativeImbalanceOf<Self>>;
@@ -58,11 +57,11 @@ pub trait Trait: frame_system::Trait {
 	/// The origin which may forcibly set or remove a name. Root can always do this.
 	type ForceOrigin: EnsureOrigin<Self::Origin>;
 
-	/// The minimum length a name may be.
-	type MinLength: Get<usize>;
+	/// Number of base unit for each vote
+	type NumberOfUnitPerVote: Get<u128>;
 
-	/// The maximum length a name may be.
-	type MaxLength: Get<usize>;
+	/// The ration of fee based on the number of unit
+	type FeeRatioPerVote: Get<u128>;
 }
 
 // The pallet's runtime storage items.
@@ -74,10 +73,14 @@ decl_storage! {
 	trait Store for Module<T: Trait> as QuadraticFundingModule {
 		// Learn more about declaring storage items:
 		// https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
-		Something get(fn something): Option<u32>;
-		Round get(fn rounds): u64;
+		Round get(fn rounds): u32;
+		// supportPool, preTaxSupportPool, _totalSupportArea
+		SupportPool get(fn support_pool): u128;
+		PreTaxSupportPool get(fn pre_tax_support_pool): u128;
+		TotalSupportArea get(fn total_support_area): u128;
+		TotalTax get(fn total_tax): u128;
 		Projects get(fn projects): map hasher(blake2_128_concat) T::Hash => ProjectOf<T>;
-		ProjectVotes: double_map hasher(blake2_128_concat) T::Hash, hasher(blake2_128_concat) T::AccountId => u32;
+		ProjectVotes: double_map hasher(blake2_128_concat) T::Hash, hasher(blake2_128_concat) T::AccountId => u128;
 	}
 }
 
@@ -88,8 +91,8 @@ decl_event!(
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
 		ProjectRegistered(Hash, AccountId),
-		VoteCost(Hash, u32),
-		VoteSucceed(Hash, AccountId, u32),
+		VoteCost(Hash, u128),
+		VoteSucceed(Hash, AccountId, u128),
 	}
 );
 
@@ -103,6 +106,8 @@ decl_error! {
 		DuplicateProject,
 		ProjectNotExist,
 		InvalidBallot,
+		DonationTooSmall,
+		InvalidRound,
 	}
 }
 
@@ -116,24 +121,57 @@ decl_module! {
 
 		// Events must be initialized if they are used by the pallet.
 		fn deposit_event() = default;
-		const ReservationFee: BalanceOf<T> = T::ReservationFee::get();
+		const UnitOfVote: u128 = T::UnitOfVote::get();
+		const NumberOfUnitPerVote: u128 = T::NumberOfUnitPerVote::get();
+		const FeeRatioPerVote: u128 = T::FeeRatioPerVote::get();
 
-		/// An example of transfer
+		/// get sponsored
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn trans(origin, beneficiary: <T::Lookup as StaticLookup>::Source, #[compact] amount: BalanceOf<T>) -> dispatch::DispatchResult {
+		pub fn donate(origin, #[compact] amount: BalanceOf<T>) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
-			let beneficiary =  T::Lookup::lookup(beneficiary)?;
-			let _ = T::Currency::transfer(&who, &Self::account_id(), amount, KeepAlive);
+			// the minimum unit, make sure the donate is bigger than this
+			let min_unit_number = Self::cal_amount(1u128, false);
+			let amount_number = Self::balance_to_u128(amount);
+			let fee_number = T::FeeRatioPerVote::get().checked_mul(amount_number / T::NumberOfUnitPerVote::get()).unwrap();
+			ensure!(amount_number > min_unit_number, Error::<T>::DonationTooSmall);
+			PreTaxSupportPool::mutate(|pool| *pool=amount_number.checked_add(*pool).unwrap());
+			SupportPool::mutate(|pool| *pool=(amount_number-fee_number).checked_add(*pool).unwrap());
 
+			TotalTax::mutate(|pool| *pool=fee_number.checked_add(*pool).unwrap());
+			let _ = T::Currency::transfer(&who, &Self::account_id(), amount, KeepAlive);
 			Ok(())
 		}
 
-		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn withdraw(origin, beneficiary: <T::Lookup as StaticLookup>::Source, #[compact] amount: BalanceOf<T>) -> dispatch::DispatchResult {
-			let who = ensure_signed(origin)?;
-			let beneficiary =  T::Lookup::lookup(beneficiary)?;
-			let _ = T::Currency::transfer(&Self::account_id(), &who, amount, KeepAlive);
+		// #[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
+		// pub fn withdraw(origin, beneficiary: <T::Lookup as StaticLookup>::Source, #[compact] amount: BalanceOf<T>) -> dispatch::DispatchResult {
+		// 	let who = ensure_signed(origin)?;
+		// 	let beneficiary =  T::Lookup::lookup(beneficiary)?;
+		// 	let _ = T::Currency::transfer(&Self::account_id(), &who, amount, KeepAlive);
 
+		// 	Ok(())
+		// }
+		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
+		pub fn end_round(origin, round: u32) -> dispatch::DispatchResult {
+			//ensure_root(origin)?;
+			ensure!(round == Round::get(), Error::<T>::InvalidRound);
+			let area = TotalSupportArea::get();
+			let pool = SupportPool::get();
+			for (hash, mut project) in Projects::<T>::iter() {
+				if area > 0 {
+					let total = project.grants;
+					project.grants = total.checked_add(
+						project.support_area.checked_mul(pool/area).unwrap()
+					).unwrap();
+				}
+				debug::info!("Hash: {:?}, Total votes: {:?}, Grants: {:?}", hash, project.total_votes, project.grants);
+				// reckon the final grants
+				let _ = T::Currency::transfer(
+					&Self::account_id(),
+					&project.owner,
+					Self::u128_to_balance(project.grants),
+					KeepAlive
+				);
+			}
 			Ok(())
 		}
 
@@ -151,37 +189,38 @@ decl_module! {
 			};
 			ensure!(!Projects::<T>::contains_key(&hash), Error::<T>::DuplicateProject);
 			Projects::<T>::insert(hash, project);
+			Round::put(1);
 			Self::deposit_event(RawEvent::ProjectRegistered(hash, who));
 			Ok(())
 		}
 
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn vote(origin, hash: T::Hash, ballot: u32) -> dispatch::DispatchResult {
+		pub fn vote(origin, hash: T::Hash, ballot: u128) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(Projects::<T>::contains_key(&hash), Error::<T>::ProjectNotExist);
 			ensure!(ballot > 0, Error::<T>::InvalidBallot);
-			//ProjectVotes::<T>::insert(hash, &who, ballot);
 			let voted = ProjectVotes::<T>::get(hash, &who);
 			let cost = Self::cal_cost(voted, ballot);
-			debug::info!("Current votes: {:?}", voted);
-			debug::info!("Est cost: {:?}", cost);
 			ProjectVotes::<T>::insert(hash, &who, ballot+voted);
-			// Projects::<T>::mutate(hash, |poj| -> DispatchResult {
-			// 	let mut project = poj;
-			// 	project.total_votes += ballot;
-			// 	Ok(())
-			// })?;
+			let amount = Self::cal_amount(cost, false);
+			let fee = Self::cal_amount(cost, true);
 			Projects::<T>::mutate(hash, |poj| {
-				poj.total_votes += ballot;	
+				let support_area = ballot.checked_mul(poj.total_votes - voted).unwrap();
+				poj.support_area = support_area.checked_add(poj.support_area).unwrap();
+				poj.total_votes += ballot;
+				poj.grants += amount - fee;
+				debug::info!("Total votes: {:?}, Current votes: {:?}, Support Area: {:?},Est cost: {:?}",
+				poj.total_votes, voted, support_area, cost);
+				TotalSupportArea::mutate(|area| *area=support_area.checked_add(*area).unwrap());
+				TotalTax::mutate(|tax| *tax=fee.checked_add(*tax).unwrap());
 			});
-			let amount = cost.checked_mul(100).unwrap().into();
-			T::Currency::transfer(&who, &Self::account_id(), amount, KeepAlive);
+			let _ = T::Currency::transfer(&who, &Self::account_id(), Self::u128_to_balance(amount), KeepAlive);
 			Self::deposit_event(RawEvent::VoteSucceed(hash, who, ballot));
 			Ok(())
 		}
 
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn vote_cost(origin, hash: T::Hash, ballot: u32) -> dispatch::DispatchResult {
+		pub fn vote_cost(origin, hash: T::Hash, ballot: u128) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(Projects::<T>::contains_key(&hash), Error::<T>::ProjectNotExist);
 			ensure!(ballot > 0, Error::<T>::InvalidBallot);
@@ -203,9 +242,28 @@ impl<T: Trait> Module<T> {
 	pub fn account_id() -> T::AccountId {
 		T::ModuleId::get().into_account()
 	}
-	 pub fn cal_cost(voted: u32, ballot: u32) -> u32 {
+	pub fn cal_cost(voted: u128, ballot: u128) -> u128 {
 		let mut points = ballot.checked_mul(ballot.checked_add(1).unwrap()).unwrap() / 2; 
 		points = points.checked_add(ballot.checked_mul(voted).unwrap()).unwrap();
 		return points;
-	 }
+	}
+
+	pub fn cal_amount(amount: u128, is_fee: bool) -> u128 {
+		let uov = T::UnitOfVote::get();
+		let nup = T::NumberOfUnitPerVote::get();
+		let frpv = T::FeeRatioPerVote::get();
+		if is_fee { 
+			uov.checked_mul(frpv).unwrap().checked_mul(amount).unwrap() 
+		} else {
+			uov.checked_mul(nup).unwrap().checked_mul(amount).unwrap()
+		}
+	}
+
+	pub fn u128_to_balance(cost: u128) -> BalanceOf<T> {
+		TryInto::<BalanceOf::<T>>::try_into(cost).ok().unwrap()
+	}
+
+	pub fn balance_to_u128(balance: BalanceOf<T>) -> u128 {
+		TryInto::<u128>::try_into(balance).ok().unwrap()
+	}
 }
