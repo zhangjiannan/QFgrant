@@ -284,10 +284,6 @@ impl pallet_quadratic_funding::Trait for Runtime {
     // No action is taken when deposits are forfeited.
     type Slashed = ();
 
-    // Configure the FRAME System Root origin as the Nick pallet admin.
-    // https://substrate.dev/rustdocs/v2.0.0/frame_system/enum.RawOrigin.html#variant.Root
-    type ForceOrigin = frame_system::EnsureRoot<AccountId>;
-
     // Use the MinNickLength from the parameter_types block.
     type NumberOfUnitPerVote = NumberOfUnit;
 
@@ -314,7 +310,7 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the template pallet in the runtime.
-		QuadraticFundingModule: pallet_quadratic_funding::{Module, Call, Storage, Event<T>},
+		QuadraticFunding: pallet_quadratic_funding::{Module, Call, Storage, Event<T>},
 	}
 );
 

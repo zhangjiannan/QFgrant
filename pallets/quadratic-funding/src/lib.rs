@@ -54,9 +54,6 @@ pub trait Trait: frame_system::Trait {
 	/// What to do with slashed funds.
 	type Slashed: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
-	/// The origin which may forcibly set or remove a name. Root can always do this.
-	type ForceOrigin: EnsureOrigin<Self::Origin>;
-
 	/// Number of base unit for each vote
 	type NumberOfUnitPerVote: Get<u128>;
 
@@ -70,7 +67,7 @@ decl_storage! {
 	// A unique name is used to ensure that the pallet's storage items are isolated.
 	// This name may be updated, but each pallet in the runtime must use a unique name.
 	// ---------------------------------vvvvvvvvvvvvvv
-	trait Store for Module<T: Trait> as QuadraticFundingModule {
+	trait Store for Module<T: Trait> as QuadraticFunding {
 		// Learn more about declaring storage items:
 		// https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
 		Round get(fn rounds): u32;
