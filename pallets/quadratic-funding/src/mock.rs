@@ -13,8 +13,7 @@ impl_outer_origin! {
 }
 
 mod quadratic_funding {
-	// Re-export needed for `impl_outer_event!`.
-	pub use super::super::*;
+	pub use crate::Event;
 }
 
 impl_outer_event! {
@@ -26,7 +25,6 @@ impl_outer_event! {
 }
 
 // Configure a mock runtime to test the pallet.
-
 #[derive(Clone, Eq, PartialEq)]
 pub struct Test;
 parameter_types! {
@@ -108,8 +106,8 @@ impl Trait for Test {
 	type Event = Event;
 }
 
-type System = frame_system::Module<Test>;
-type Balances = pallet_balances::Module<Test>;
+pub type System = frame_system::Module<Test>;
+pub type Balances = pallet_balances::Module<Test>;
 pub type QuadraticFunding = Module<Test>;
 
 // Build genesis storage according to the mock runtime.
@@ -118,7 +116,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
 	pallet_balances::GenesisConfig::<Test>{
 		// Total issuance will be 200 with treasury account initialized at ED.
-		balances: vec![(0, 100), (1, 98), (2, 1)],
+		balances: vec![(0, 1000), (1, 500), (2, 300)],
 	}.assimilate_storage(&mut t).unwrap();
 	system::GenesisConfig::default().assimilate_storage::<Test>(&mut t).unwrap();
 	t.into()
