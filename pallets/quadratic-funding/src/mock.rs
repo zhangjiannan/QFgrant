@@ -35,12 +35,12 @@ parameter_types! {
 }
 
 parameter_types! {
-	// pow(10,12) => Unit, for easy fee control, we use pow(10,9)
-    pub const VoteUnit: u128 = 1000000000;
-	// The base of unit per vote, should be 1 Unit of token for each vote
-    pub const NumberOfUnit: u128 = 1000;
+	// for testing, set unit to pico
+    pub const VoteUnit: u128 = 1;
+	// The base of unit per vote, should be 100 pico of token for each vote
+    pub const NumberOfUnit: u128 = 100;
     // The ratio of fee for each trans, final value should be FeeRatio/NumberOfUnit
-    pub const FeeRatio: u128 = 60;
+    pub const FeeRatio: u128 = 5;
 	pub const QuadraticFundingModuleId: ModuleId = ModuleId(*b"py/quafd");
 }
 
