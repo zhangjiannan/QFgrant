@@ -13,7 +13,6 @@ use sp_runtime::{ModuleId, traits::{StaticLookup, AccountIdConversion}};
 use frame_support::codec::{Encode, Decode};
 use frame_system::{ensure_signed, ensure_root};
 use sp_std::{vec::Vec, convert::{TryInto}};
-// use sp_runtime::traits::CheckedMul;
 
 #[cfg(test)]
 mod mock;
@@ -71,7 +70,7 @@ decl_storage! {
 		// Learn more about declaring storage items:
 		// https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
 		Round get(fn rounds): u32;
-		// supportPool, preTaxSupportPool, _totalSupportArea
+		// Variables for funding and voting calculation
 		SupportPool get(fn support_pool): u128;
 		PreTaxSupportPool get(fn pre_tax_support_pool): u128;
 		TotalSupportArea get(fn total_support_area): u128;
@@ -86,9 +85,11 @@ decl_storage! {
 decl_event!(
 	pub enum Event<T> where AccountId = <T as frame_system::Trait>::AccountId, Hash =  <T as frame_system::Trait>::Hash, {
 		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
+		/// parameters. [project_hash, who]
 		ProjectRegistered(Hash, AccountId),
+		/// parameters. [project_hash, balance of cost]
 		VoteCost(Hash, u128),
+		/// parameters. [project_hash, who, number of ballots]
 		VoteSucceed(Hash, AccountId, u128),
 	}
 );
