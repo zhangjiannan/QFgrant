@@ -78,6 +78,15 @@ decl_storage! {
 		Projects get(fn projects): map hasher(blake2_128_concat) T::Hash => ProjectOf<T>;
 		ProjectVotes: double_map hasher(blake2_128_concat) T::Hash, hasher(blake2_128_concat) T::AccountId => u128;
 	}
+	add_extra_genesis {
+		build(|_config| {
+			// Create Treasury account
+			let _ = T::Currency::make_free_balance_be(
+				&<Module<T>>::account_id(),
+				T::Currency::minimum_balance(),
+			);
+		});
+	}
 }
 
 // Pallets use events to inform users when important changes are made.
@@ -224,6 +233,7 @@ decl_module! {
 			ensure!(ballot > 0, Error::<T>::InvalidBallot);
 			let voted = ProjectVotes::<T>::get(hash, &who);
 			let cost = Self::cal_cost(voted, ballot);
+			debug::info!("Current balance: {:?}", T::Currency::free_balance(&Self::account_id()));
 			Self::deposit_event(RawEvent::VoteCost(hash, cost));
 			Ok(())
 		}

@@ -48,12 +48,14 @@ fn donate_works() {
 	new_test_ext().execute_with(|| {
 		// Dispatch a signed extrinsic.
 		assert_ok!(QuadraticFunding::donate(Origin::signed(0), 500));
+		// make sure the source and dest balance is right
 		assert_eq!(Balances::free_balance(0), 500);
+		assert_eq!(Balances::free_balance(&QuadraticFunding::account_id()), 500);		
 		// check the support pool
 		assert_eq!(QuadraticFunding::pre_tax_support_pool(), 500);
 		// fee rate is 5%
 		assert_eq!(QuadraticFunding::total_tax(), 25);
-		assert_eq!(QuadraticFunding::support_pool(), 475);		
+		assert_eq!(QuadraticFunding::support_pool(), 475);
 	});
 }
 
