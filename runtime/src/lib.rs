@@ -29,8 +29,9 @@ pub use sp_runtime::BuildStorage;
 pub use pallet_timestamp::Call as TimestampCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use sp_runtime::{Permill, Perbill};
+use frame_system::{EnsureRoot};
 pub use frame_support::{
-	construct_runtime, parameter_types, StorageValue,
+	construct_runtime, parameter_types, StorageValue, 
 	traits::{KeyOwnerProofSystem, Randomness},
 	weights::{
 		Weight, IdentityFee,
@@ -268,7 +269,10 @@ parameter_types! {
     pub const NumberOfUnit: u128 = 1000;
     // The ratio of fee for each trans, final value should be FeeRatio/NumberOfUnit
     pub const FeeRatio: u128 = 60;
+	// Use moduleid to generate internal accountid
 	pub const QuadraticFundingModuleId: ModuleId = ModuleId(*b"py/quafd");
+	pub const NameMinLength: usize = 3;
+	pub const NameMaxLength: usize = 32;
 }
 
 /// Configure the template pallet in pallets/template.
@@ -292,6 +296,15 @@ impl pallet_quadratic_funding::Trait for Runtime {
 
     // The ubiquitous event type.
     type Event = Event;
+
+	// The minimum length of project name
+	type NameMinLength = NameMinLength;
+
+	// The maximum length of project name
+	type NameMaxLength = NameMaxLength;
+
+	// Origin who can control the round
+	type AdminOrigin = EnsureRoot<AccountId>;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

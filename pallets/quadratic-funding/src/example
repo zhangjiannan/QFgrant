@@ -1,3 +1,5 @@
+// use this link to run SCALE decode https://www.shawntabrizi.com/substrate-js-utilities/codec/
+// types to decode project
 [
   {
     "Project": {
@@ -6,8 +8,19 @@
       "support_area": "u128",
       "withdrew": "u128",
       "name": "Vec<u8>",
-      "round": "u32",
       "owner": "AccountId"
+    }
+  }
+]
+// types to decode round
+[
+  {
+    "Round": {
+      "ongoing":"bool",
+      "support_pool": "u128",
+      "pre_tax_support_pool": "u128",
+      "total_support_area": "u128",
+      "total_tax": "u128"
     }
   }
 ]

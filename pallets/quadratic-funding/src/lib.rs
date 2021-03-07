@@ -9,9 +9,9 @@ use frame_support::{
 	decl_module, decl_storage, decl_event, decl_error, dispatch, debug, ensure,
 	traits::{Currency, EnsureOrigin, ReservableCurrency, OnUnbalanced, Get, ExistenceRequirement::{KeepAlive}},
 };
-use sp_runtime::{ModuleId, traits::{StaticLookup, AccountIdConversion}};
+use sp_runtime::{ModuleId, traits::{ AccountIdConversion}};
 use frame_support::codec::{Encode, Decode};
-use frame_system::{ensure_signed, ensure_root};
+use frame_system::{ensure_signed};
 use sp_std::{vec::Vec, convert::{TryInto}};
 
 #[cfg(test)]
@@ -27,8 +27,16 @@ pub struct Project<AccountId> {
 	pub support_area: u128,
 	pub withdrew: u128,
 	pub name: Vec<u8>,
-	pub round: u32,
 	pub owner: AccountId,
+}
+
+#[derive(Encode, Decode, Default, Clone, PartialEq)]
+pub struct Round {
+	pub ongoing: bool,
+	pub support_pool: u128,
+	pub pre_tax_support_pool: u128,
+	pub total_support_area: u128,
+	pub total_tax: u128,
 }
 
 type ProjectOf<T> = Project<<T as frame_system::Trait>::AccountId>;
@@ -40,6 +48,9 @@ pub trait Trait: frame_system::Trait {
 	// used to generate sovereign account
 	// refer: https://github.com/paritytech/substrate/blob/743accbe3256de2fc615adcaa3ab03ebdbbb4dbd/frame/treasury/src/lib.rs#L92
 	type ModuleId: Get<ModuleId>;
+
+	/// Origin from which admin must come.
+	type AdminOrigin: EnsureOrigin<Self::Origin>;
 
     // The runtime must supply this pallet with an Event type that satisfies the pallet's requirements.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
@@ -58,6 +69,14 @@ pub trait Trait: frame_system::Trait {
 
 	/// The ration of fee based on the number of unit
 	type FeeRatioPerVote: Get<u128>;
+
+	/// The minimum length of project name
+	type NameMinLength: Get<usize>;
+
+	/// The maximum length of project name
+	type NameMaxLength: Get<usize>;
+
+	
 }
 
 // The pallet's runtime storage items.
@@ -65,22 +84,17 @@ pub trait Trait: frame_system::Trait {
 decl_storage! {
 	// A unique name is used to ensure that the pallet's storage items are isolated.
 	// This name may be updated, but each pallet in the runtime must use a unique name.
-	// ---------------------------------vvvvvvvvvvvvvv
 	trait Store for Module<T: Trait> as QuadraticFunding {
 		// Learn more about declaring storage items:
 		// https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
-		Round get(fn rounds): u32;
-		// Variables for funding and voting calculation
-		SupportPool get(fn support_pool): u128;
-		PreTaxSupportPool get(fn pre_tax_support_pool): u128;
-		TotalSupportArea get(fn total_support_area): u128;
-		TotalTax get(fn total_tax): u128;
-		Projects get(fn projects): map hasher(blake2_128_concat) T::Hash => ProjectOf<T>;
+		// Map, each round start with an id => bool 
+		Rounds get(fn rounds): map hasher(blake2_128_concat) u32 => Round;
+		Projects get(fn projects): double_map hasher(blake2_128_concat) u32, hasher(blake2_128_concat) T::Hash => ProjectOf<T>;
 		ProjectVotes: double_map hasher(blake2_128_concat) T::Hash, hasher(blake2_128_concat) T::AccountId => u128;
 	}
 	add_extra_genesis {
 		build(|_config| {
-			// Create Treasury account
+			// Create pallet's internal account
 			let _ = T::Currency::make_free_balance_be(
 				&<Module<T>>::account_id(),
 				T::Currency::minimum_balance(),
@@ -100,6 +114,10 @@ decl_event!(
 		VoteCost(Hash, u128),
 		/// parameters. [project_hash, who, number of ballots]
 		VoteSucceed(Hash, AccountId, u128),
+		/// parameters. [round_id]
+		RoundStarted(u32),
+		/// parameters. [round_id]
+		RoundEnded(u32),
 	}
 );
 
@@ -112,9 +130,13 @@ decl_error! {
 		StorageOverflow,
 		DuplicateProject,
 		ProjectNotExist,
+		ProjectNameTooLong,
+		ProjectNameTooShort,
 		InvalidBallot,
 		DonationTooSmall,
-		InvalidRound,
+		RoundNotExist,
+		RoundHasEnded,
+		DuplicateRound,
 	}
 }
 
@@ -131,39 +153,63 @@ decl_module! {
 		const UnitOfVote: u128 = T::UnitOfVote::get();
 		const NumberOfUnitPerVote: u128 = T::NumberOfUnitPerVote::get();
 		const FeeRatioPerVote: u128 = T::FeeRatioPerVote::get();
+		const NameMinLength: u32 = T::NameMinLength::get() as u32;
+		const NameMaxLength: u32 = T::NameMaxLength::get() as u32;
 
-		/// get sponsored
+		/// A round gets sponsored, this will transfer from sponsor's account to our internal account with the amount to be sponsored
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn donate(origin, #[compact] amount: BalanceOf<T>) -> dispatch::DispatchResult {
+		pub fn donate(origin, #[compact] amount: BalanceOf<T>, round_id: u32) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
-			// the minimum unit, make sure the donate is bigger than this
+			ensure!(Rounds::contains_key(&round_id), Error::<T>::RoundNotExist);
+			let round = Rounds::get(round_id);
+			ensure!(true == round.ongoing, Error::<T>::RoundHasEnded);
+			// the minimum unit, make sure the donate is greater than this
 			let min_unit_number = Self::cal_amount(1u128, false);
 			let amount_number = Self::balance_to_u128(amount);
 			let fee_number = T::FeeRatioPerVote::get().checked_mul(amount_number / T::NumberOfUnitPerVote::get()).unwrap();
 			ensure!(amount_number > min_unit_number, Error::<T>::DonationTooSmall);
-			PreTaxSupportPool::mutate(|pool| *pool=amount_number.checked_add(*pool).unwrap());
-			SupportPool::mutate(|pool| *pool=(amount_number-fee_number).checked_add(*pool).unwrap());
-
-			TotalTax::mutate(|pool| *pool=fee_number.checked_add(*pool).unwrap());
 			let _ = T::Currency::transfer(&who, &Self::account_id(), amount, KeepAlive);
+			// update the round
+			Rounds::mutate(round_id, |rnd| {
+				let ptsp = rnd.pre_tax_support_pool;
+				let sp = rnd.support_pool;
+				let tt = rnd.total_tax;
+				rnd.pre_tax_support_pool = amount_number.checked_add(ptsp).unwrap();
+				rnd.support_pool = (amount_number-fee_number).checked_add(sp).unwrap();
+				rnd.total_tax = fee_number.checked_add(tt).unwrap();
+			});
 			Ok(())
 		}
 
-		// #[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		// pub fn withdraw(origin, beneficiary: <T::Lookup as StaticLookup>::Source, #[compact] amount: BalanceOf<T>) -> dispatch::DispatchResult {
-		// 	let who = ensure_signed(origin)?;
-		// 	let beneficiary =  T::Lookup::lookup(beneficiary)?;
-		// 	let _ = T::Currency::transfer(&Self::account_id(), &who, amount, KeepAlive);
-
-		// 	Ok(())
-		// }
+		/// Create a new round, make sure to use a fresh index, any used index is not allowed, even those ended
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn end_round(origin, round: u32) -> dispatch::DispatchResult {
-			//ensure_root(origin)?;
-			ensure!(round == Round::get(), Error::<T>::InvalidRound);
-			let area = TotalSupportArea::get();
-			let pool = SupportPool::get();
-			for (hash, mut project) in Projects::<T>::iter() {
+		pub fn start_round(origin, round_id: u32) -> dispatch::DispatchResult {
+			// Only amdin can control the round 
+			T::AdminOrigin::ensure_origin(origin)?;
+			ensure!(!Rounds::contains_key(&round_id), Error::<T>::RoundNotExist);
+			let round = Round {
+				ongoing: true,
+				support_pool: 0,
+				pre_tax_support_pool: 0,
+				total_support_area: 0,
+				total_tax: 0
+			};
+			Rounds::insert(round_id, round);
+			Self::deposit_event(RawEvent::RoundStarted(round_id));
+			Ok(())
+		}
+
+		/// End an `ongoing` round and distribute the funds in sponsor pool, any invalid index or round status will cause errors
+		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
+		pub fn end_round(origin, round_id: u32) -> dispatch::DispatchResult {
+			// Only amdin can control the round 
+			T::AdminOrigin::ensure_origin(origin)?;
+			ensure!(Rounds::contains_key(&round_id), Error::<T>::RoundNotExist);
+			let mut round = Rounds::get(round_id);
+			ensure!(true == round.ongoing, Error::<T>::RoundHasEnded);
+			let area = round.total_support_area;
+			let pool = round.support_pool;
+			for (hash, mut project) in Projects::<T>::iter_prefix(round_id) {
 				if area > 0 {
 					let total = project.grants;
 					project.grants = total.checked_add(
@@ -179,58 +225,83 @@ decl_module! {
 					KeepAlive
 				);
 			}
+			round.ongoing = false;
+			Rounds::insert(round_id, round);
+			Self::deposit_event(RawEvent::RoundEnded(round_id));
 			Ok(())
 		}
 
+		/// Register a project in an ongoing round, so that it can be voted
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn register_project(origin, hash: T::Hash, name: Vec<u8>) -> dispatch::DispatchResult {
+		pub fn register_project(origin, hash: T::Hash, name: Vec<u8>, round_id: u32) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
+			ensure!(name.len() >= T::NameMinLength::get(), Error::<T>::ProjectNameTooShort);
+			ensure!(name.len() <= T::NameMaxLength::get(), Error::<T>::ProjectNameTooLong);
+			ensure!(!Projects::<T>::contains_key(&round_id, &hash), Error::<T>::DuplicateProject);
 			let project = Project {
 				total_votes: 0,
 				grants: 0,
 				support_area: 0,
 				withdrew: 0,
 				name: name,
-				round: 1,
 				owner: who.clone(),
 			};
-			ensure!(!Projects::<T>::contains_key(&hash), Error::<T>::DuplicateProject);
-			Projects::<T>::insert(hash, project);
-			Round::put(1);
+			Projects::<T>::insert(round_id, hash, project);
 			Self::deposit_event(RawEvent::ProjectRegistered(hash, who));
 			Ok(())
 		}
 
+		/// Vote to a project, this function will transfer corresponding amount of token per your input ballot
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn vote(origin, hash: T::Hash, ballot: u128) -> dispatch::DispatchResult {
+		pub fn vote(origin, hash: T::Hash, round_id: u32, ballot: u128) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
-			ensure!(Projects::<T>::contains_key(&hash), Error::<T>::ProjectNotExist);
+			ensure!(Projects::<T>::contains_key(&round_id, &hash), Error::<T>::ProjectNotExist);
 			ensure!(ballot > 0, Error::<T>::InvalidBallot);
+			// check whether this round still ongoing
+			ensure!(Rounds::contains_key(&round_id), Error::<T>::RoundNotExist);
+			let round = Rounds::get(round_id);
+			ensure!(true == round.ongoing, Error::<T>::RoundHasEnded);
+			
 			let voted = ProjectVotes::<T>::get(hash, &who);
 			let cost = Self::cal_cost(voted, ballot);
 			ProjectVotes::<T>::insert(hash, &who, ballot+voted);
 			let amount = Self::cal_amount(cost, false);
 			let fee = Self::cal_amount(cost, true);
-			Projects::<T>::mutate(hash, |poj| {
+			// transfer first, update last, as transfer will ensure the free balance is enough
+			let _ = T::Currency::transfer(&who, &Self::account_id(), Self::u128_to_balance(amount), KeepAlive);
+
+			// update the project and corresponding round
+			Projects::<T>::mutate(round_id, hash, |poj| {
 				let support_area = ballot.checked_mul(poj.total_votes - voted).unwrap();
 				poj.support_area = support_area.checked_add(poj.support_area).unwrap();
 				poj.total_votes += ballot;
 				poj.grants += amount - fee;
 				debug::info!("Total votes: {:?}, Current votes: {:?}, Support Area: {:?},Est cost: {:?}",
 				poj.total_votes, voted, support_area, cost);
-				TotalSupportArea::mutate(|area| *area=support_area.checked_add(*area).unwrap());
-				TotalTax::mutate(|tax| *tax=fee.checked_add(*tax).unwrap());
+				Rounds::mutate(round_id, |rnd| {
+					let tsa = rnd.total_support_area;
+					let tt = rnd.total_tax;
+					rnd.total_support_area = support_area.checked_add(tsa).unwrap();
+					rnd.total_tax = fee.checked_add(tt).unwrap();
+				});
 			});
-			let _ = T::Currency::transfer(&who, &Self::account_id(), Self::u128_to_balance(amount), KeepAlive);
 			Self::deposit_event(RawEvent::VoteSucceed(hash, who, ballot));
 			Ok(())
 		}
 
+		/// Calculate the amount of token to spend per your vote history and ballot
+		///
+		/// This function should only query project, projectVotes and round once, shall NOT update storage
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn vote_cost(origin, hash: T::Hash, ballot: u128) -> dispatch::DispatchResult {
+		pub fn vote_cost(origin, hash: T::Hash, round_id:u32, ballot: u128) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
-			ensure!(Projects::<T>::contains_key(&hash), Error::<T>::ProjectNotExist);
+			ensure!(Projects::<T>::contains_key(&round_id, &hash), Error::<T>::ProjectNotExist);
 			ensure!(ballot > 0, Error::<T>::InvalidBallot);
+			// check whether this round still ongoing
+			ensure!(Rounds::contains_key(&round_id), Error::<T>::RoundNotExist);
+			let round = Rounds::get(round_id);
+			ensure!(true == round.ongoing, Error::<T>::RoundHasEnded);
+		
 			let voted = ProjectVotes::<T>::get(hash, &who);
 			let cost = Self::cal_cost(voted, ballot);
 			debug::info!("Current balance: {:?}", T::Currency::free_balance(&Self::account_id()));
@@ -250,6 +321,7 @@ impl<T: Trait> Module<T> {
 	pub fn account_id() -> T::AccountId {
 		T::ModuleId::get().into_account()
 	}
+
 	pub fn cal_cost(voted: u128, ballot: u128) -> u128 {
 		let mut points = ballot.checked_mul(ballot.checked_add(1).unwrap()).unwrap() / 2; 
 		points = points.checked_add(ballot.checked_mul(voted).unwrap()).unwrap();
