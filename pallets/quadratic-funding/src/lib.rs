@@ -9,7 +9,7 @@ use frame_support::{
 	decl_module, decl_storage, decl_event, decl_error, dispatch, debug, ensure,
 	traits::{Currency, EnsureOrigin, ReservableCurrency, OnUnbalanced, Get, ExistenceRequirement::{KeepAlive}},
 };
-use sp_runtime::{ModuleId, traits::{ AccountIdConversion}};
+use sp_runtime::{ModuleId, traits::{ Hash, AccountIdConversion}};
 use frame_support::codec::{Encode, Decode};
 use frame_system::{ensure_signed};
 use sp_std::{vec::Vec, convert::{TryInto}};
@@ -118,6 +118,8 @@ decl_event!(
 		RoundStarted(u32),
 		/// parameters. [round_id]
 		RoundEnded(u32),
+		/// parameters. [round_id, who, amount]
+		DonateSucceed(u32, AccountId, u128),
 	}
 );
 
@@ -134,6 +136,7 @@ decl_error! {
 		ProjectNameTooShort,
 		InvalidBallot,
 		DonationTooSmall,
+		RoundExisted,
 		RoundNotExist,
 		RoundHasEnded,
 		DuplicateRound,
@@ -178,6 +181,7 @@ decl_module! {
 				rnd.support_pool = (amount_number-fee_number).checked_add(sp).unwrap();
 				rnd.total_tax = fee_number.checked_add(tt).unwrap();
 			});
+			Self::deposit_event(RawEvent::DonateSucceed(round_id, who, Self::balance_to_u128(amount)));
 			Ok(())
 		}
 
@@ -186,7 +190,7 @@ decl_module! {
 		pub fn start_round(origin, round_id: u32) -> dispatch::DispatchResult {
 			// Only amdin can control the round 
 			T::AdminOrigin::ensure_origin(origin)?;
-			ensure!(!Rounds::contains_key(&round_id), Error::<T>::RoundNotExist);
+			ensure!(!Rounds::contains_key(&round_id), Error::<T>::RoundExisted);
 			let round = Round {
 				ongoing: true,
 				support_pool: 0,
@@ -261,10 +265,12 @@ decl_module! {
 			ensure!(Rounds::contains_key(&round_id), Error::<T>::RoundNotExist);
 			let round = Rounds::get(round_id);
 			ensure!(true == round.ongoing, Error::<T>::RoundHasEnded);
-			
-			let voted = ProjectVotes::<T>::get(hash, &who);
+
+			// need to calculate hash of project hash and round_id combination here to avoid conflicts of projects in different rounds
+			let vote_hash = T::Hashing::hash_of(&(&hash, &round_id));
+			let voted = ProjectVotes::<T>::get(vote_hash, &who);
 			let cost = Self::cal_cost(voted, ballot);
-			ProjectVotes::<T>::insert(hash, &who, ballot+voted);
+			ProjectVotes::<T>::insert(vote_hash, &who, ballot+voted);
 			let amount = Self::cal_amount(cost, false);
 			let fee = Self::cal_amount(cost, true);
 			// transfer first, update last, as transfer will ensure the free balance is enough
@@ -302,7 +308,9 @@ decl_module! {
 			let round = Rounds::get(round_id);
 			ensure!(true == round.ongoing, Error::<T>::RoundHasEnded);
 		
-			let voted = ProjectVotes::<T>::get(hash, &who);
+			// need to calculate hash of project hash and round_id combination here to avoid conflicts of projects in different rounds
+			let vote_hash = T::Hashing::hash_of(&(&hash, &round_id));
+			let voted = ProjectVotes::<T>::get(vote_hash, &who);
 			let cost = Self::cal_cost(voted, ballot);
 			debug::info!("Current balance: {:?}", T::Currency::free_balance(&Self::account_id()));
 			Self::deposit_event(RawEvent::VoteCost(hash, cost));
