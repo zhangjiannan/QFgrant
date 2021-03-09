@@ -161,7 +161,7 @@ decl_module! {
 
 		/// A round gets sponsored, this will transfer from sponsor's account to our internal account with the amount to be sponsored
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn donate(origin, #[compact] amount: BalanceOf<T>, round_id: u32) -> dispatch::DispatchResult {
+		pub fn donate(origin, round_id: u32, #[compact] amount: BalanceOf<T>) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(Rounds::contains_key(&round_id), Error::<T>::RoundNotExist);
 			let round = Rounds::get(round_id);
@@ -237,7 +237,7 @@ decl_module! {
 
 		/// Register a project in an ongoing round, so that it can be voted
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn register_project(origin, hash: T::Hash, name: Vec<u8>, round_id: u32) -> dispatch::DispatchResult {
+		pub fn register_project(origin, round_id: u32, hash: T::Hash, name: Vec<u8>) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(name.len() >= T::NameMinLength::get(), Error::<T>::ProjectNameTooShort);
 			ensure!(name.len() <= T::NameMaxLength::get(), Error::<T>::ProjectNameTooLong);
@@ -257,7 +257,7 @@ decl_module! {
 
 		/// Vote to a project, this function will transfer corresponding amount of token per your input ballot
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn vote(origin, hash: T::Hash, round_id: u32, ballot: u128) -> dispatch::DispatchResult {
+		pub fn vote(origin, round_id: u32, hash: T::Hash, ballot: u128) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(Projects::<T>::contains_key(&round_id, &hash), Error::<T>::ProjectNotExist);
 			ensure!(ballot > 0, Error::<T>::InvalidBallot);
@@ -299,7 +299,7 @@ decl_module! {
 		///
 		/// This function should only query project, projectVotes and round once, shall NOT update storage
 		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn vote_cost(origin, hash: T::Hash, round_id:u32, ballot: u128) -> dispatch::DispatchResult {
+		pub fn vote_cost(origin, round_id:u32, hash: T::Hash, ballot: u128) -> dispatch::DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(Projects::<T>::contains_key(&round_id, &hash), Error::<T>::ProjectNotExist);
 			ensure!(ballot > 0, Error::<T>::InvalidBallot);

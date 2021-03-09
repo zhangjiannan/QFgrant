@@ -5,7 +5,7 @@ use frame_support::{impl_outer_origin, impl_outer_event, parameter_types, weight
 use sp_runtime::{
 	Perbill, ModuleId,
 	testing::Header,
-	traits::{BlakeTwo256, IdentityLookup, BadOrigin},
+	traits::{BlakeTwo256, IdentityLookup},
 };
 
 impl_outer_origin! {
@@ -42,6 +42,8 @@ parameter_types! {
     // The ratio of fee for each trans, final value should be FeeRatio/NumberOfUnit
     pub const FeeRatio: u128 = 5;
 	pub const QuadraticFundingModuleId: ModuleId = ModuleId(*b"py/quafd");
+	pub const NameMinLength: usize = 3;
+	pub const NameMaxLength: usize = 32;
 }
 
 impl system::Trait for Test {
@@ -104,6 +106,14 @@ impl Trait for Test {
     type FeeRatioPerVote = FeeRatio;
 
 	type Event = Event;
+
+	type AdminOrigin = frame_system::EnsureRoot<u64>;
+
+	// The minimum length of project name
+	type NameMinLength = NameMinLength;
+
+	// The maximum length of project name
+	type NameMaxLength = NameMaxLength;
 }
 
 pub type System = frame_system::Module<Test>;
