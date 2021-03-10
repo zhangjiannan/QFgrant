@@ -270,13 +270,13 @@ decl_module! {
 			let vote_hash = T::Hashing::hash_of(&(&hash, &round_id));
 			let voted = ProjectVotes::<T>::get(vote_hash, &who);
 			let cost = Self::cal_cost(voted, ballot);
-			ProjectVotes::<T>::insert(vote_hash, &who, ballot+voted);
 			let amount = Self::cal_amount(cost, false);
 			let fee = Self::cal_amount(cost, true);
 			// transfer first, update last, as transfer will ensure the free balance is enough
 			let _ = T::Currency::transfer(&who, &Self::account_id(), Self::u128_to_balance(amount), KeepAlive);
 
 			// update the project and corresponding round
+			ProjectVotes::<T>::insert(vote_hash, &who, ballot+voted);
 			Projects::<T>::mutate(round_id, hash, |poj| {
 				let support_area = ballot.checked_mul(poj.total_votes - voted).unwrap();
 				poj.support_area = support_area.checked_add(poj.support_area).unwrap();
