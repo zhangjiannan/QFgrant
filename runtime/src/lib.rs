@@ -276,7 +276,7 @@ parameter_types! {
 }
 
 /// Configure the template pallet in pallets/template.
-impl pallet_quadratic_funding::Trait for Runtime {
+impl pallet_quadratic_funding::Config for Runtime {
 	type ModuleId = QuadraticFundingModuleId;
     // The Balances pallet implements the ReservableCurrency trait.
     // https://substrate.dev/rustdocs/v2.0.0/pallet_balances/index.html#implementations-2

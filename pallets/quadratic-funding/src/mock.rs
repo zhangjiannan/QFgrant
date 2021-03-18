@@ -1,4 +1,4 @@
-use crate::{Module, Trait};
+use crate::{Module, Config};
 use frame_system as system;
 use sp_core::H256;
 use frame_support::{impl_outer_origin, impl_outer_event, parameter_types, weights::Weight};
@@ -87,7 +87,7 @@ impl pallet_balances::Trait for Test {
 	type WeightInfo = ();
 }
 
-impl Trait for Test {
+impl Config for Test {
 	type ModuleId = QuadraticFundingModuleId;
     // The Balances pallet implements the ReservableCurrency trait.
     // https://substrate.dev/rustdocs/v2.0.0/pallet_balances/index.html#implementations-2
