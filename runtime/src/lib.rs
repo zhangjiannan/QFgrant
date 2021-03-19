@@ -487,6 +487,13 @@ impl_runtime_apis! {
 		}
 	}
 
+	// Custom RPC needed
+	impl pallet_quadratic_funding_runtime_api::QuadraticFundingApi<Block, AccountId, Hash> for Runtime {
+		fn vote_cost(who: AccountId, round_id:u32, hash: Hash, ballot: u32) -> u32 {
+			QuadraticFunding::vote_cost(who, round_id, hash, ballot)
+		}
+	}
+
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {
 		fn dispatch_benchmark(

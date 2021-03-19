@@ -3505,6 +3505,8 @@ dependencies = [
  "frame-benchmarking-cli",
  "jsonrpc-core",
  "node-template-runtime",
+ "pallet-quadratic-funding-rpc",
+ "pallet-quadratic-funding-runtime-api",
  "pallet-transaction-payment-rpc",
  "sc-basic-authorship",
  "sc-cli",
@@ -3547,6 +3549,7 @@ dependencies = [
  "pallet-balances",
  "pallet-grandpa",
  "pallet-quadratic-funding",
+ "pallet-quadratic-funding-runtime-api",
  "pallet-randomness-collective-flip",
  "pallet-sudo",
  "pallet-timestamp",
@@ -3821,6 +3824,41 @@ dependencies = [
  "pallet-balances",
  "parity-scale-codec",
  "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-quadratic-funding-rpc"
+version = "2.0.1"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "jsonrpc-core",
+ "jsonrpc-core-client",
+ "jsonrpc-derive",
+ "pallet-quadratic-funding-runtime-api",
+ "parity-scale-codec",
+ "sp-api",
+ "sp-blockchain",
+ "sp-core",
+ "sp-rpc",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-quadratic-funding-runtime-api"
+version = "2.0.1"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-quadratic-funding",
+ "parity-scale-codec",
+ "serde_json",
+ "sp-api",
  "sp-core",
  "sp-io",
  "sp-runtime",

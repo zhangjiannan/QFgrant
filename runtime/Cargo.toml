@@ -26,6 +26,7 @@ serde = { features = ['derive'], optional = true, version = '1.0.119' }
 
 # local dependencies
 pallet-quadratic-funding = { path = '../pallets/quadratic-funding', default-features = false, version = '2.0.1' }
+pallet-quadratic-funding-runtime-api = { path = "../pallets/quadratic-funding/runtime-api", default-features = false, version = '2.0.1' }
 
 # Substrate dependencies
 frame-benchmarking = { default-features = false, optional = true, version = '2.0.1' }
@@ -54,6 +55,7 @@ sp-std = { default-features = false, version = '2.0.1' }
 sp-transaction-pool = { default-features = false, version = '2.0.1' }
 sp-version = { default-features = false, version = '2.0.1' }
 
+
 [features]
 default = ['std']
 runtime-benchmarks = [
@@ -79,6 +81,7 @@ std = [
     'pallet-randomness-collective-flip/std',
     'pallet-sudo/std',
     'pallet-quadratic-funding/std',
+    'pallet-quadratic-funding-runtime-api/std',
     'pallet-timestamp/std',
     'pallet-transaction-payment/std',
     'pallet-transaction-payment-rpc-runtime-api/std',

@@ -24,6 +24,8 @@ structopt = '0.3.8'
 
 # local dependencies
 node-template-runtime = { path = '../runtime', version = '2.0.1' }
+pallet-quadratic-funding-rpc = { path = "../pallets/quadratic-funding/rpc" }
+pallet-quadratic-funding-runtime-api = { path = "../pallets/quadratic-funding/runtime-api" }
 
 # Substrate dependencies
 frame-benchmarking = '2.0.1'

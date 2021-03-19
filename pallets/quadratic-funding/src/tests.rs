@@ -55,8 +55,9 @@ fn register_project_works() {
 		);
 
 		assert_eq!(Balances::free_balance(0), 1000);
-		assert_ok!(QuadraticFunding::vote_cost(Origin::signed(1), round_id, hash, 1));
-		assert_eq!(last_event(), RawEvent::VoteCost(hash,1));
+		// Deprecated! This method has been changed to rpc
+		// assert_ok!(QuadraticFunding::vote_cost(Origin::signed(1), round_id, hash, 1));
+		// assert_eq!(last_event(), RawEvent::VoteCost(hash,1));
 	});
 }
 

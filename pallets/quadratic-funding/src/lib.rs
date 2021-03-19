@@ -294,28 +294,6 @@ decl_module! {
 			Self::deposit_event(RawEvent::VoteSucceed(hash, who, ballot));
 			Ok(())
 		}
-
-		/// Calculate the amount of token to spend per your vote history and ballot
-		///
-		/// This function should only query project, projectVotes and round once, shall NOT update storage
-		#[weight = 10_000 + T::DbWeight::get().reads_writes(1,1)]
-		pub fn vote_cost(origin, round_id:u32, hash: T::Hash, ballot: u128) -> dispatch::DispatchResult {
-			let who = ensure_signed(origin)?;
-			ensure!(Projects::<T>::contains_key(&round_id, &hash), Error::<T>::ProjectNotExist);
-			ensure!(ballot > 0, Error::<T>::InvalidBallot);
-			// check whether this round still ongoing
-			ensure!(Rounds::contains_key(&round_id), Error::<T>::RoundNotExist);
-			let round = Rounds::get(round_id);
-			ensure!(true == round.ongoing, Error::<T>::RoundHasEnded);
-		
-			// need to calculate hash of project hash and round_id combination here to avoid conflicts of projects in different rounds
-			let vote_hash = T::Hashing::hash_of(&(&hash, &round_id));
-			let voted = ProjectVotes::<T>::get(vote_hash, &who);
-			let cost = Self::cal_cost(voted, ballot);
-			debug::info!("Current balance: {:?}", T::Currency::free_balance(&Self::account_id()));
-			Self::deposit_event(RawEvent::VoteCost(hash, cost));
-			Ok(())
-		}
 	}
 }
 
@@ -353,5 +331,13 @@ impl<T: Config> Module<T> {
 
 	pub fn balance_to_u128(balance: BalanceOf<T>) -> u128 {
 		TryInto::<u128>::try_into(balance).ok().unwrap()
+	}
+
+	// TODO: There is a bug for serde_json, can not use u128 https://github.com/paritytech/substrate/issues/4641
+	pub fn vote_cost(who: T::AccountId, round_id:u32, hash: T::Hash, ballot: u32) -> u32 {
+		// need to calculate hash of project hash and round_id combination here to avoid conflicts of projects in different rounds
+		let vote_hash = T::Hashing::hash_of(&(&hash, &round_id));
+		let voted = ProjectVotes::<T>::get(vote_hash, &who);
+		TryInto::<u32>::try_into(Self::cal_cost(voted, ballot.into())).ok().unwrap()
 	}
 }
