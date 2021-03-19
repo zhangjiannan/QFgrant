@@ -35,7 +35,7 @@ make build
 ```
 
 ## Test & Run
-The `make test` command will run all the test cases in [tests.rs](./pallets/quadratic-funding/tests.rs).  
+The `make test` command will run all the test cases in [tests.rs](./pallets/quadratic-funding/src/tests.rs).  
 
 The `make run` command will launch a temporary node and its state will be discarded after you
 terminate the process. After the project has been built, there are other ways to launch the node.
