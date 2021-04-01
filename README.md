@@ -5,6 +5,7 @@ A fresh pallet which implements quadratic voting and funding using [Substrate](h
 ## Getting Started
 
 This project contains is developed with Rust, please make sure you have set up rust correctly before running and testing.
+A detailed test guide can be found [here](./doc/test-guide.md)
 
 ### Rust Setup
 
