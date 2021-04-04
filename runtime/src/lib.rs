@@ -492,6 +492,9 @@ impl_runtime_apis! {
 		fn vote_cost(who: AccountId, round_id:u32, hash: Hash, ballot: u32) -> u32 {
 			QuadraticFunding::vote_cost(who, round_id, hash, ballot)
 		}
+		fn projects_per_round(round_id:u32) -> Vec<(Hash, u32, u32, u32)> {
+			QuadraticFunding::projects_per_round(round_id)
+		}
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]

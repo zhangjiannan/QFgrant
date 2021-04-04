@@ -12,7 +12,7 @@ use frame_support::{
 use sp_runtime::{ModuleId, traits::{ Hash, AccountIdConversion}};
 use frame_support::codec::{Encode, Decode};
 use frame_system::{ensure_signed};
-use sp_std::{vec::Vec, convert::{TryInto}};
+use sp_std::{vec, vec::Vec, convert::{TryInto}};
 
 #[cfg(test)]
 mod mock;
@@ -38,6 +38,15 @@ pub struct Round {
 	pub total_support_area: u128,
 	pub total_tax: u128,
 }
+
+// TODO: This is designed for rpc return, need to investigate feasibility, use tuple instead
+// #[derive(Encode, Decode, Default, Clone, PartialEq)]
+// pub struct RankingProject<ProjectHash> {
+// 	pub project_id: ProjectHash,
+// 	pub total_votes: u32,
+// 	pub grants: u32,
+// 	pub support_grants: u32,
+// }
 
 type ProjectOf<T> = Project<<T as frame_system::Trait>::AccountId>;
 type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Trait>::AccountId>>::Balance;
@@ -339,5 +348,25 @@ impl<T: Config> Module<T> {
 		let vote_hash = T::Hashing::hash_of(&(&hash, &round_id));
 		let voted = ProjectVotes::<T>::get(vote_hash, &who);
 		TryInto::<u32>::try_into(Self::cal_cost(voted, ballot.into())).ok().unwrap()
+	}
+
+	// TODO, using struct is a little complicate, use tuple instead
+	// (project_id, total_votes, grants, support_grants)
+	pub fn projects_per_round(round_id:u32) -> Vec<(T::Hash, u32, u32, u32)> {
+		let mut projects  = vec![];
+		let round = Rounds::get(round_id);
+		let area = round.total_support_area;
+		let pool = round.support_pool;
+		for (hash, project) in Projects::<T>::iter_prefix(round_id) {
+			let mut sg = 0;
+			if area > 0 {
+				sg = project.support_area.checked_mul(pool/area).unwrap()
+			}
+			let total_votes = TryInto::<u32>::try_into(project.total_votes).ok().unwrap();
+			let grants = TryInto::<u32>::try_into(project.grants.checked_div(T::UnitOfVote::get()).unwrap()).ok().unwrap();
+			let support_grants = TryInto::<u32>::try_into(sg.checked_div(T::UnitOfVote::get()).unwrap()).ok().unwrap();
+			projects.push((hash, total_votes, grants, support_grants))
+		}
+		projects
 	}
 }

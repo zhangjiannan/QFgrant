@@ -5,6 +5,7 @@ use jsonrpc_core::{Error as RpcError, ErrorCode, Result};
 use jsonrpc_derive::rpc;
 use sp_runtime::{generic::BlockId, traits::{Block as BlockT, MaybeDisplay}};
 use sp_api::ProvideRuntimeApi;
+use sp_std::vec::Vec;
 pub use pallet_quadratic_funding_runtime_api::QuadraticFundingApi as QuadraticFundingRuntimeApi;
 pub use self::gen_client::Client as QuadraticFundingClient;
 
@@ -20,6 +21,12 @@ pub trait QuadraticFundingApi<AccountId, Hash> {
         project_hash: Hash, 
         ballot: u32
 	) -> Result<u32>;
+
+	#[rpc(name = "qf_ranks")]
+	fn projects_per_round(
+		&self,
+        round_id:u32,
+	) -> Result<Vec<(Hash, u32, u32, u32)>>;
 }
 
 /// A struct that implements the [`QuadraticFundingApi`].
@@ -74,6 +81,19 @@ where
 		let best = self.client.info().best_hash;
 		let at = BlockId::hash(best);
 		api.vote_cost(&at, who, round_id, project_hash, ballot).map_err(|e| RpcError {
+			code: ErrorCode::ServerError(Error::RuntimeError.into()),
+			message: "Unable to query dispatch info.".into(),
+			data: Some(format!("{:?}", e).into()),
+		})
+	}
+	fn projects_per_round(
+		&self,
+        round_id:u32,
+	) -> Result<Vec<(Hash, u32, u32, u32)>> {
+		let api = self.client.runtime_api();
+		let best = self.client.info().best_hash;
+		let at = BlockId::hash(best);
+		api.projects_per_round(&at, round_id).map_err(|e| RpcError {
 			code: ErrorCode::ServerError(Error::RuntimeError.into()),
 			message: "Unable to query dispatch info.".into(),
 			data: Some(format!("{:?}", e).into()),
