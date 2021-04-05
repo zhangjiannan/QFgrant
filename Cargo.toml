@@ -7,5 +7,6 @@ members = [
     'pallets/*',
     'runtime',
 ]
-[replace]
-"rocksdb:0.15.0" = { path = '/opt/rust-rocksdb/' }
+# For Apple M1 build
+# [replace]
+# "rocksdb:0.15.0" = { path = '/opt/rust-rocksdb/' }

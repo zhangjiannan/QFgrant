@@ -21,7 +21,8 @@ substrate-build-script-utils = '2.0.1'
 [dependencies]
 jsonrpc-core = '15.0.0'
 structopt = '0.3.8'
-libc = { version = '=0.2.81' }
+# For Apple M1 build
+# libc = { version = '=0.2.81' }
 
 # local dependencies
 node-template-runtime = { path = '../runtime', version = '2.0.1' }
