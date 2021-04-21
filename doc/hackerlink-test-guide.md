@@ -1,9 +1,13 @@
 ### Introduction
-This document is for milestone-2, which demonstrates a complete flow of quadratic funding pallet based on substrate. We have deployed our pallet to a private chain, you can access the chain info [here](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fdao.tophacker.com#/explorer)  
-We have integrated the functions with our own [website](https://qf.tophacker.com/en/Grant?type=Polkadot). To reduce your testing steps, we have set up the round and uploaded some demo projects in advance.
+
+This document is a black-box testing guide quadratic funding pallet's milestone-2, which demonstrates a complete flow of quadratic funding pallet based on substrate. We have deployed the quadratic funding pallet to a private node, you can access the chain [here](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fdao.tophacker.com#/explorer).
+
+We now have a frontend integration with [HackerLink](https://qf.tophacker.com/en/Grant?type=Polkadot). The website is a testing site of HackerLink, it's not in production and no real users and projects are using this website. For testing purposes, we have set up the round and uploaded some demo projects in advance. (Please note that these projects are only for demonstration purposes and they are not real projects)
+
+To access the real HackerLink website, use https://hackerlink.io/en.
 
 ### Prerequisites
-1. Modern web browsers installed, Chrome/Firefox recommended
+1. Chrome web browser required
 2. Install polkadot js extension for your browser https://polkadot.js.org/extension/
 3. Use the extension to create new account and allow to use on any chain
 
@@ -18,8 +22,8 @@ For security concern, we have disabled refresh and direct navigation of project 
 ```  
 ![alt m2-home](images/m2-home.png)
 ![alt m2-ranking](images/m2-ranking.png)  
-4. Choose any project you want to vote, and input the ballots you want. You'll see an estimated cost when changing the number of ballot, just make sure your balance is enough.  
+4. Choose any project you want to vote, and input the number of votes you want to commit. You'll see an estimated cost of votes when changing the number of votes, just make sure your balance is enough.  
 ![alt m2-vote](images/m2-vote.png)
 5. Click the breadcrumbs and navigate back to the project list(ie. Grant details), check the ranking. Or you can just vote more than once for a project to see if the cost is applied to the quadratic voting rules.  
-6. If you want to sponsor our round, just go back to https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fdao.tophacker.com#/explorer and send a donate extrinsic. After that you can check the ranking, should've updated correctly.
+6. If you want to sponsor our demo round, just go back to https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fdao.tophacker.com#/explorer and send a donate extrinsic. After that you can check the ranking, should've updated correctly.
 ![alt m2-donate](images/m2-donate.png)
