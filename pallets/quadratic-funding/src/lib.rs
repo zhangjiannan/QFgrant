@@ -250,6 +250,7 @@ decl_module! {
 			let who = ensure_signed(origin)?;
 			ensure!(name.len() >= T::NameMinLength::get(), Error::<T>::ProjectNameTooShort);
 			ensure!(name.len() <= T::NameMaxLength::get(), Error::<T>::ProjectNameTooLong);
+			ensure!(Rounds::<T>::contains_key(&round_id), Error::<T>::RoundNotExist);
 			ensure!(!Projects::<T>::contains_key(&round_id, &hash), Error::<T>::DuplicateProject);
 			let project = Project {
 				total_votes: 0,
